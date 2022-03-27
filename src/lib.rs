@@ -23,7 +23,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     let router = Router::new();
 
     router
-        .get("/", |req, ctx| {
+        .get_async("/", |req, ctx| async move {
             let request_url = req.url().unwrap_or_else(|err| panic!("Could not parse '{:?}': {}", stringify!($var), err));
             let parsed_url = Url::parse(request_url.as_str())?;
             let hash_query: HashMap<_, _> = parsed_url.query_pairs().into_owned().collect();
@@ -36,7 +36,26 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
             console_log!("{:?}" ,image_width);
             console_log!("{:?}" ,image_quality);
 
-            Response::ok(hash_query.get("src").unwrap())
+            let client = reqwest::Client::new();
+
+            let resp = client
+              .get(String::from(image_src))
+              .send()
+              .await
+              .unwrap();
+        
+            match resp.status() {
+              reqwest::StatusCode::OK => {
+                let data = resp.bytes().await.expect("error loading bytes");
+                let data = data.collect().expect("Unable to read data");
+                let image = image::load_from_memory(&data).expect("Error loading image from memory");
+
+
+                Response::ok(hash_query.get("src").unwrap())
+              }
+              reqwest::StatusCode::UNAUTHORIZED => return Response::error("Bad Request", 401),
+              _ => return Response::error("Bad Request", 400)
+          }
         })
         .get("/worker-version", |_, ctx| {
             let version = ctx.var("WORKERS_RS_VERSION")?.to_string();
