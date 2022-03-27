@@ -280,7 +280,7 @@ checksum = "843c03199d0c0ca54bc1ea90ac0d507274c28abcc4f691ae8b4eaa375087c76a"
 dependencies = [
  "futures-core",
  "futures-sink",
- "nanorand 0.7.0",
+ "nanorand",
  "pin-project",
  "spin",
 ]
@@ -582,7 +582,7 @@ dependencies = [
  "cfg-if 0.1.10",
  "console_error_panic_hook",
  "image",
- "nanorand 0.5.2",
+ "nanorand",
  "reqwest",
  "serde_json",
  "worker",
@@ -768,12 +768,6 @@ checksum = "b9f1c5b025cda876f66ef43a113f91ebc9f4ccef34843000e0adf6ebbab84e21"
 dependencies = [
  "winapi",
 ]
-
-[[package]]
-name = "nanorand"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac1378b66f7c93a1c0f8464a19bf47df8795083842e5090f4b7305973d5a22d0"
 
 [[package]]
 name = "nanorand"
