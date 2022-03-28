@@ -1,5 +1,6 @@
 use worker::*;
 use std::collections::HashMap;
+use std::str;
 
 mod utils;
 
@@ -30,10 +31,6 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
             let image_src = hash_query.get("src").unwrap();
             let image_width = hash_query.get("w").unwrap().parse::<u32>().unwrap();
             let image_quality = hash_query.get("q").unwrap().parse::<u8>().unwrap();
-            
-            console_log!("{:?}" ,image_src);
-            console_log!("{:?}" ,image_width);
-            console_log!("{:?}" ,image_quality);
 
             let client = reqwest::Client::new();
 
@@ -49,9 +46,21 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                 let image = image::load_from_memory(&data).expect("Error loading image from memory");
                 
                 let image_scaled = image
-                  .resize(image_width, u32::MAX, image::imageops::FilterType::Nearest);
+                  .resize(image_width, u32::MAX, image::imageops::FilterType::Nearest)
+                  .to_rgb8()
+                  .to_vec();
 
-                return Response::ok(image_scaled.width().to_string())
+
+                // let mut headers =worker::Headers::new();
+                // headers.set("Access-Control-Allow-Headers","Content-Type");
+                // headers.set("Content-Type","image/jpeg");
+
+                let s = match str::from_utf8(&image_scaled) {
+                  Ok(v) => v,
+                  Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+                };
+
+                return Response::ok(s)
               }
               reqwest::StatusCode::UNAUTHORIZED => return Response::error("Bad Request", 401),
               _ => return Response::error("Bad Request", 400)
