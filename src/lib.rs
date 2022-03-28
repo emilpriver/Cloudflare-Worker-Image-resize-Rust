@@ -2,7 +2,6 @@ use worker::*;
 use std::collections::HashMap;
 
 mod utils;
-mod image_resize;
 
 fn log_request(req: &Request) {
     console_log!(
@@ -29,8 +28,8 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
             let hash_query: HashMap<_, _> = parsed_url.query_pairs().into_owned().collect();
 
             let image_src = hash_query.get("src").unwrap();
-            let image_width = hash_query.get("w").unwrap();
-            let image_quality = hash_query.get("q").unwrap();
+            let image_width = hash_query.get("w").unwrap().parse::<u32>().unwrap();
+            let image_quality = hash_query.get("q").unwrap().parse::<u8>().unwrap();
             
             console_log!("{:?}" ,image_src);
             console_log!("{:?}" ,image_width);
@@ -47,11 +46,12 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
             match resp.status() {
               reqwest::StatusCode::OK => {
                 let data = resp.bytes().await.expect("error loading bytes");
-                let data = data.collect().expect("Unable to read data");
                 let image = image::load_from_memory(&data).expect("Error loading image from memory");
+                
+                let image_scaled = image
+                  .resize(image_width, u32::MAX, image::imageops::FilterType::Nearest);
 
-
-                Response::ok(hash_query.get("src").unwrap())
+                return Response::ok(image_scaled.width().to_string())
               }
               reqwest::StatusCode::UNAUTHORIZED => return Response::error("Bad Request", 401),
               _ => return Response::error("Bad Request", 400)
@@ -64,3 +64,4 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
         .run(req, env)
         .await
 }
+  
