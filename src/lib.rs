@@ -1,6 +1,8 @@
 use worker::*;
 use std::collections::HashMap;
 use std::str;
+use std::io::Cursor;
+use std::option::Option;
 
 mod utils;
 
@@ -22,15 +24,24 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
 
     let router = Router::new();
 
+    if !matches!(req.method(), Method::Get) {
+      return Response::error("Method Not Allowed", 405);
+  }
+
     router
         .get_async("/", |req, ctx| async move {
             let request_url = req.url().unwrap_or_else(|err| panic!("Could not parse '{:?}': {}", stringify!($var), err));
+            let request_headers = req.headers();
             let parsed_url = Url::parse(request_url.as_str())?;
             let hash_query: HashMap<_, _> = parsed_url.query_pairs().into_owned().collect();
 
             let image_src = hash_query.get("src").unwrap();
             let image_width = hash_query.get("w").unwrap().parse::<u32>().unwrap();
             let image_quality = hash_query.get("q").unwrap().parse::<u8>().unwrap();
+
+            let supported_image_format = request_headers
+              .get("Accept")
+              .unwrap_or(Some("image/jpeg".to_string()));
 
             let client = reqwest::Client::new();
 
@@ -45,24 +56,35 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                 let data = resp.bytes().await.expect("error loading bytes");
                 let image = image::load_from_memory(&data).expect("Error loading image from memory");
                 
-                let image_scaled = image
+                let mut new_image: Vec<u8> = Vec::new();
+
+                let mut image_transform_format: image::ImageFormat = image::ImageFormat::Jpeg; 
+                let mut image_transform_format_header: String= "image/jpeg".to_string();
+
+                if format!("{:?}", supported_image_format).contains("image/webp") {
+                  image_transform_format = image::ImageFormat::WebP;
+                  image_transform_format_header = "image/webp".to_string();
+                }
+    
+                if format!("{:?}", supported_image_format).contains("image/avif") {
+                  image_transform_format =  image::ImageFormat::Avif;
+                  image_transform_format_header = "image/avif".to_string();
+                }
+
+                image
                   .resize(image_width, u32::MAX, image::imageops::FilterType::Nearest)
-                  .to_rgb8()
-                  .to_vec();
+                  .write_to(&mut Cursor::new(&mut new_image), image_transform_format)
+                  .expect("Error writing image");
 
+                let mut headers =worker::Headers::new();
+                headers.set("Access-Control-Allow-Headers","Content-Type");
+                headers.set("Content-Type",&image_transform_format_header);
+                headers.set("Cache-Control", "max-age=2629746");
 
-                // let mut headers =worker::Headers::new();
-                // headers.set("Access-Control-Allow-Headers","Content-Type");
-                // headers.set("Content-Type","image/jpeg");
+                let body: worker::ResponseBody = ResponseBody::Body(new_image);
 
-                let s = match str::from_utf8(&image_scaled) {
-                  Ok(v) => v,
-                  Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-                };
-
-                return Response::ok(s)
+                return Response::from_body(body)
               }
-              reqwest::StatusCode::UNAUTHORIZED => return Response::error("Bad Request", 401),
               _ => return Response::error("Bad Request", 400)
           }
         })
