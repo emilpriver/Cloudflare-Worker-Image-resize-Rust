@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::str;
 use std::io::Cursor;
 use std::option::Option;
+use webp::*;
 
 mod utils;
 
@@ -39,9 +40,10 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
             let image_width = hash_query.get("w").unwrap().parse::<u32>().unwrap();
             let image_quality = hash_query.get("q").unwrap().parse::<u8>().unwrap();
 
-            let supported_image_format = request_headers
+            let mut supported_image_format = request_headers
               .get("Accept")
               .unwrap_or(Some("image/jpeg".to_string()));
+            let supported_image_format = format!("{:?}", &supported_image_format);
 
             let client = reqwest::Client::new();
 
@@ -61,23 +63,23 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                 let mut image_transform_format: image::ImageFormat = image::ImageFormat::Jpeg; 
                 let mut image_transform_format_header: String = "image/jpeg".to_string();
 
-                // if format!("{:?}", supported_image_format).contains("image/webp") {
-                //   image_transform_format = image::ImageFormat::WebP;
-                //   image_transform_format_header = "image/webp".to_string();
-                // }
-    
-                // if format!("{:?}", supported_image_format).contains("image/avif") {
-                //   image_transform_format =  image::ImageFormat::Avif;
-                //   image_transform_format_header = "image/avif".to_string();
-                // }
 
-                image
+                if formated_format_string.contains("image/avif") {
+
+                } else if formated_format_string.contains("image/webp") {
+                  // Create the WebP encoder for the above image
+                  let encoder: Encoder = Encoder::from_image(&img).unwrap();
+                  // Encode the image at a specified quality 0-100
+                  let webp: WebPMemory = encoder.encode(90f32);
+                } else {
+                  image
                   .resize(image_width, u32::MAX, image::imageops::FilterType::Nearest)
                   .write_to(
                     &mut Cursor::new(&mut new_image),
                     image_transform_format
                   )
                   .expect("Error writing image");
+                }
 
                 let mut headers =worker::Headers::new();
                 headers.set("Access-Control-Allow-Headers","Content-Type");
