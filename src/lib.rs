@@ -58,7 +58,11 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
 
             let client = reqwest::Client::new();
 
-            let resp = client.get(image_src).send().await;
+            let resp = client
+                .get(image_src)
+                .send()
+                .await
+                .unwrap();
 
             match resp.status() {
                 reqwest::StatusCode::OK => {
@@ -81,7 +85,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                     };
 
                     let image = match image::load_from_memory(&image_to_bytes) {
-                        Some(value) => value,
+                        Some(value) => value.await,
                         None => {
                             return Ok(
                                 Response::error("Error loading image from memory", 400).unwrap()
@@ -89,11 +93,8 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                         }
                     };
 
-                    // Type inferred
-                    // Does not have to be mutable as it's not changing
                     let image_transform_format = image::ImageFormat::Jpeg;
-                    // Type inferred
-                    // Does not have to be mutable as it's not changing
+
                     let image_transform_format_header = "image/jpeg";
 
                     // if format!("{:?}", supported_image_format).contains("image/webp") {
@@ -130,13 +131,12 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                     let _ = headers.set("Content-Type", &image_transform_format_header);
                     let _ = headers.set("Cache-Control", "max-age=2629746");
 
-                    // Type is inferred
                     let body = ResponseBody::Body(new_image);
 
                     // Implicit return (learn to love it)
                     Ok(Response::from_body(body).unwrap().with_headers(headers))
                 }
-                _ => Ok(Response::error("Bad Request", 400).unwrap()),
+                _ => Response::error("Bad Request", 400).unwrap(),
             }
         })
         .get("/worker-version", |_, ctx| {
