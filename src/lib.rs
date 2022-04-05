@@ -47,7 +47,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                 None => return Ok(Response::error("Missing width", 400).unwrap()),
             };
 
-            let image_quality = match hash_query.get("src") {
+            let image_quality = match hash_query.get("q") {
                 Some(val) => val.parse::<u8>().unwrap(),
                 None => 80,
             };
@@ -58,23 +58,15 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
 
             let client = reqwest::Client::new();
 
-            let resp = client
-                .get(image_src)
-                .send()
-                .await
-                .unwrap();
+            let resp = client.get(image_src).send().await;
 
             match resp.status() {
                 reqwest::StatusCode::OK => {
                     let image_to_bytes = match resp {
-                        Some(resp) => match resp.bytes().await {
+                        Some(resp) => match resp.bytes() {
                             Some(bytes) => bytes,
                             None => {
-                                return Ok(Response::error(
-                                    "Error converting image into bytes",
-                                    400,
-                                )
-                                .unwrap())
+                                return Response::error("Error converting image into bytes", 400)
                             }
                         },
                         None => {
@@ -136,7 +128,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                     // Implicit return (learn to love it)
                     Ok(Response::from_body(body).unwrap().with_headers(headers))
                 }
-                _ => Response::error("Bad Request", 400).unwrap(),
+                _ => Response::error("Bad Request", 400),
             }
         })
         .get("/worker-version", |_, ctx| {
