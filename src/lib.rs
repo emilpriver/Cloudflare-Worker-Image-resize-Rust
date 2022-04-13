@@ -58,27 +58,18 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
 
             let client = reqwest::Client::new();
 
-            let resp = client.get(image_src).send().await;
+            let resp = client.get(image_src).send().await.unwrap();
 
             match resp.status() {
                 reqwest::StatusCode::OK => {
-                    let image_to_bytes = match resp {
-                        Some(resp) => match resp.bytes() {
-                            Some(bytes) => bytes,
-                            None => {
-                                return Response::error("Error converting image into bytes", 400)
-                            }
-                        },
-                        None => {
-                            return Ok(
-                                Response::error("Error loading image from origin", 400).unwrap()
-                            )
-                        }
+                    let image_to_bytes = match resp.bytes().await {
+                        Ok(b) => b,
+                        _ => return Response::error("Error converting image into bytes", 400),
                     };
 
                     let image = match image::load_from_memory(&image_to_bytes) {
-                        Some(value) => value.await,
-                        None => {
+                        Ok(value) => value,
+                        _ => {
                             return Ok(
                                 Response::error("Error loading image from memory", 400).unwrap()
                             )
@@ -104,8 +95,9 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                         u32::MAX,
                         image::imageops::FilterType::Nearest,
                     ) {
-                        Some(value) => value,
-                        None => {
+                        // Yes, this is bad :)
+                        data => data,
+                        _ => {
                             return Ok(Response::error("Error when resizing image", 400).unwrap())
                         }
                     };

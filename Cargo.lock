@@ -716,6 +716,7 @@ dependencies = [
 name = "image-resize-rust"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "cfg-if 0.1.10",
  "console_error_panic_hook",
  "image",
